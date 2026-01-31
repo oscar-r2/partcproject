@@ -1,0 +1,10 @@
+Description,Label Name,Spec Code - Char 1,Spec Code - Char 2,Spec Code - Char 3,String Position - Char 1,String Position - Char 2,String Position - Char 3,Acceptance Boundary,Quantity Required,Message if detected,Message if undetected,Message Priority
+Ace of Spades,AS,A,S,,1,2,,,2,,,
+Ace of Clubs,AC,A,C,,1,2,,,2,,,
+Ace of Diamonds,AD,A,D,,1,2,,,2,,,
+Ace of Hearts,AH,A,H,,1,2,,,2,,,
+Two of Spades,2S,2,S,,3,4,,,2,,,
+Two of Clubs,2C,2,C,,3,4,,,2,,,
+Two of Diamonds,2D,2,D,,3,4,,,2,,,
+Two of Hearts,2H,2,H,,3,4,,,2,,,
+King of Hearts,KH,D,,,0,,,,0,,,
