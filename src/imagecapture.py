@@ -1,6 +1,7 @@
 import cv2
 import os
 from datetime import datetime
+from fps import FPSCounter
 
 # Create captures folder if it doesn't exist
 save_dir = "captures"
@@ -40,6 +41,7 @@ def draw_text_box(frame, text, x=10, y=10, padding=10, bg_color=(50,50,50), text
         y_offset += h + 5  # move down for next line
 
 cam = cv2.VideoCapture(0)
+fps_counter_obj = FPSCounter()
 
 if not cam.isOpened():
     print("Could not open camera")
@@ -57,7 +59,9 @@ while True:
         print("Failed to grab frame")
         break
     
-    draw_text_box(frame, "press 'ENTER' to capture image or 'q' to quit")
+    fps_counter_obj.update()
+    fps_counter_obj.draw(frame)
+    draw_text_box(frame, "'ENTER' - capture image\n'q' - quit")
     cv2.imshow("Live Preview", frame)
 
 

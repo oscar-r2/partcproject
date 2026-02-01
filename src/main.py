@@ -8,14 +8,13 @@ import csv
 import os
 import sys
 import cv2
+from fps import FPSCounter
 from ultralytics import YOLO
 
 # Define path to model and other user variables
-model_path = 'models/yolov8s_playing_cards.pt'  # Path to model
+model_path = 'models/yolov8s_playing_cards_ncnn_model'  # Path to model
 cam_index = 0                          # Index of USB camera
 imgW, imgH = 1280, 720                 # Resolution to run USB camera at
-
-import cv2
 
 def draw_text_box(frame, text, x=10, y=10, padding=10, bg_color=(50,50,50), text_color=(255,255,255)):
     # Split text into lines
@@ -186,9 +185,12 @@ bbox_colors = [(164,120,87), (68,148,228), (93,97,209), (178,182,133), (88,159,1
 current=getNextBuild()
 partsList=lookupCurrent(current)
 required=getPartsListPrintable(partsList)
+
+#define fps counter
+fps_counter_obj = FPSCounter()
+
 # Begin inference loop
 while True:
-    
     
     # Grab frame from counter
     ret, frame = cap.read()
@@ -248,6 +250,8 @@ while True:
     # Draw text box with data
     draw_text_box(frame,(required+"\nOUTPUT: "+ output))
     
+    fps_counter_obj.update()
+    fps_counter_obj.draw(frame)
 
     # Display results
     cv2.imshow('Object detection results',frame) # Display image
