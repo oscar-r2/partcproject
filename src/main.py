@@ -1,52 +1,88 @@
-##first test program##
-
-#description
-#retrieve data string from file, and use lookup to determine OK or NG condition
-
-# Import necessary packages
+# Imports
 import csv
 import os
 import sys
 import cv2
-from fps import FPSCounter
+import time
 from ultralytics import YOLO
 
 # Define path to model and other user variables
 model_path = 'models/yolov8s_playing_cards_ncnn_model'  # Path to model
 cam_index = 0                          # Index of USB camera
 imgW, imgH = 1280, 720                 # Resolution to run USB camera at
+  
+def draw_text_box(frame, text, corner="top-left", padding=10,
+                  margin=10,
+                  bg_color=(50, 50, 50),
+                  text_color=(255, 255, 255)):
 
-def draw_text_box(frame, text, x=10, y=10, padding=10, bg_color=(50,50,50), text_color=(255,255,255)):
-    # Split text into lines
     lines = text.split("\n")
 
-    # Font settings
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.7
     thickness = 2
+    line_spacing = 5
 
-    # Compute width and height based on text
     max_width = 0
     total_height = 0
+    line_sizes = []
 
     # Measure each line
     for line in lines:
-        (w, h), _ = cv2.getTextSize(line, font, font_scale, thickness)
+        (w, h), baseline = cv2.getTextSize(line, font, font_scale, thickness)
         max_width = max(max_width, w)
-        total_height += h + 5  # small line spacing
+        total_height += h + line_spacing
+        line_sizes.append((w, h))
 
-    # Rectangle coordinates
-    top_left = (x, y)
-    bottom_right = (x + max_width + padding * 2, y + total_height + padding)
+    total_height -= line_spacing  # remove extra spacing from last line
 
-    # Draw filled rectangle
-    cv2.rectangle(frame, top_left, bottom_right, bg_color, cv2.FILLED)
+    # Frame dimensions
+    frame_h, frame_w = frame.shape[:2]
 
-    # Draw text inside
-    y_offset = y + padding + 20
-    for line in lines:
-        cv2.putText(frame, line, (x + padding, y_offset), font, font_scale, text_color, thickness)
-        y_offset += h + 5  # move down for next line
+    box_width = max_width + padding * 2
+    box_height = total_height + padding * 2
+
+    # Determine position based on corner
+    if corner == "top-left":
+        x = margin
+        y = margin
+    elif corner == "top-right":
+        x = frame_w - box_width - margin
+        y = margin
+    elif corner == "bottom-left":
+        x = margin
+        y = frame_h - box_height - margin
+    elif corner == "bottom-right":
+        x = frame_w - box_width - margin
+        y = frame_h - box_height - margin
+    else:
+        raise ValueError("corner must be one of: "
+                         "'top-left', 'top-right', "
+                         "'bottom-left', 'bottom-right'")
+
+    # Draw background rectangle
+    cv2.rectangle(
+        frame,
+        (x, y),
+        (x + box_width, y + box_height),
+        bg_color,
+        cv2.FILLED
+    )
+
+    # Draw text
+    y_offset = y + padding
+    for (line, (_, h)) in zip(lines, line_sizes):
+        y_offset += h
+        cv2.putText(
+            frame,
+            line,
+            (x + padding, y_offset),
+            font,
+            font_scale,
+            text_color,
+            thickness
+        )
+        y_offset += line_spacing
 
 def getNextBuild(filename='src/buildqueue.txt'):
     """
@@ -153,6 +189,7 @@ def lookupCurrent(current, lookup_file="src/playing_cards_lookup.csv"):
     return matches
 
 def getPartsListPrintable(partsList):
+    
     lines = []
 
     for part in partsList:
@@ -163,6 +200,30 @@ def getPartsListPrintable(partsList):
             lines.append(f"{part[0]} ({labelName}) x{qty}")
 
     return "\n".join(lines)
+
+class FPSCounter:
+    def __init__(self):
+        self.prev_time = time.time()
+        self.fps = 0
+
+    def update(self):
+        current_time = time.time()
+        self.fps = 1 / (current_time - self.prev_time)
+        self.prev_time = current_time
+        return self.fps
+    
+    def draw(self, frame):
+        draw_text_box(frame,"FPS: "+ str((round(self.fps,2))),"top-right")
+        return frame
+    
+class Menu:
+    def __init__(self):
+        self.options = "q-quit\ns-pause\np-save picture\nm-next data\nt-toggle inference"
+    
+    def draw(self, frame):
+        draw_text_box(frame,self.options,"bottom-left")
+
+        return frame
 # Check if model file exists and is valid
 if (not os.path.exists(model_path)):
     print('WARNING: Model path is invalid or model was not found.')
@@ -188,6 +249,7 @@ required=getPartsListPrintable(partsList)
 
 #define fps counter
 fps_counter_obj = FPSCounter()
+menu_obj = Menu()
 
 # Begin inference loop
 while True:
@@ -239,6 +301,7 @@ while True:
 
             # Add object to list of detected objects
             objects_detected.append(classname)
+            
     output = "OK"
     for part in partsList:
         labelName = part[1]               
@@ -252,12 +315,13 @@ while True:
     
     fps_counter_obj.update()
     fps_counter_obj.draw(frame)
+    menu_obj.draw(frame)
 
     # Display results
-    cv2.imshow('Object detection results',frame) # Display image
+    cv2.imshow('Object Detection System',frame) # Display image
 
-    # Poll for user keypress and wait 5ms before continuing to next frame
-    key = cv2.waitKey(5)
+    # Poll for user keypress and wait 1ms before continuing to next frame
+    key = cv2.waitKey(1)
     
     if key == ord('q') or key == ord('Q'): # Press 'q' to quit
         break
