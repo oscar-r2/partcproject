@@ -4,6 +4,7 @@ import os
 import sys
 import cv2
 import time
+from datetime import datetime
 from ultralytics import YOLO
 
 # Define path to model and other user variables
@@ -218,12 +219,48 @@ class FPSCounter:
     
 class Menu:
     def __init__(self):
-        self.options = "q-quit\ns-pause\np-save picture\nm-next data\nt-toggle inference"
+        self.capture_mode = 0 
+        self.capture_modes = [[0,"cam only"],[1,"bounding boxes"],[2, "full screenshot"]]
+        self.options = "q-quit\ns-pause\nc-capture image - "+self.capture_modes[self.capture_mode][1]+"\nm-next capture mode\nn-next data\nt-toggle inference"
+        
+    def update_capture_mode(self):
+        if self.capture_mode==2:
+            self.capture_mode =0
+        else:
+            self.capture_mode +=1
+        self.options = "q-quit\ns-pause\nc-capture image - "+self.capture_modes[self.capture_mode][1]+"\nm-next capture mode\nn-next data\nt-toggle inference"
+
+    def get_capture_mode(self):
+        return self.capture_mode
     
+    def get_capture_mode_printable(self):
+        return self.capture_modes[self.capture_mode,1]
+
+
     def draw(self, frame):
         draw_text_box(frame,self.options,"bottom-left")
 
         return frame
+    
+class CaptureSaver:
+    def _init_(self):
+        save_dir=""
+
+    def save(self,frame,capture_mode):
+        if capture_mode == 0:
+            save_dir = "captures/camera_only_captures"
+            os.makedirs(save_dir, exist_ok=True)
+        elif capture_mode == 1:
+            save_dir = "captures/bouding_box_captures"
+            os.makedirs(save_dir, exist_ok=True)
+        elif capture_mode == 2:
+            save_dir = "captures/full screenshots"
+            os.makedirs(save_dir, exist_ok=True)
+        filename = timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"{save_dir}/capture_{timestamp}.png"
+        cv2.imwrite(filename, frame)
+        print(f"Saved: {filename}")
+        
 # Check if model file exists and is valid
 if (not os.path.exists(model_path)):
     print('WARNING: Model path is invalid or model was not found.')
@@ -250,6 +287,8 @@ required=getPartsListPrintable(partsList)
 #define fps counter
 fps_counter_obj = FPSCounter()
 menu_obj = Menu()
+capture_obj = CaptureSaver()
+inference_enabled = 1
 
 # Begin inference loop
 while True:
@@ -260,59 +299,66 @@ while True:
         print('Unable to read frames from the camera. This indicates the camera is disconnected or not working. Exiting program.')
         break
 
-    # Run inference on frame with tracking enabled (tracking helps object to be consistently detected in each frame)
-    results = model.track(frame, verbose=False)
+    # save base frame before inference, in case user wants to record it later
+    base_frame = frame.copy()
 
-    # Extract results
-    detections = results[0].boxes
+    if inference_enabled:    
+        # Run inference on frame with tracking enabled (tracking helps object to be consistently detected in each frame)
+        results = model.track(frame, verbose=False)
 
-    # Initialize variable to hold every object detected in this frame
-    objects_detected = []
+        # Extract results
+        detections = results[0].boxes
 
-    # Go through each detection and get bbox coords, confidence, and class
-    for i in range(len(detections)):
+        # Initialize variable to hold every object detected in this frame
+        objects_detected = []
 
-        # Get bounding box coordinates
-        # Ultralytics returns results in Tensor format, which have to be converted to a regular Python array
-        xyxy_tensor = detections[i].xyxy.cpu() # Detections in Tensor format in CPU memory
-        xyxy = xyxy_tensor.numpy().squeeze() # Convert tensors to Numpy array
-        xmin, ymin, xmax, ymax = xyxy.astype(int) # Extract individual coordinates and convert to int
+        # Go through each detection and get bbox coords, confidence, and class
+        for i in range(len(detections)):
 
-        # Get bounding box class ID and name
-        classidx = int(detections[i].cls.item())
-        classname = labels[classidx]
+            # Get bounding box coordinates
+            # Ultralytics returns results in Tensor format, which have to be converted to a regular Python array
+            xyxy_tensor = detections[i].xyxy.cpu() # Detections in Tensor format in CPU memory
+            xyxy = xyxy_tensor.numpy().squeeze() # Convert tensors to Numpy array
+            xmin, ymin, xmax, ymax = xyxy.astype(int) # Extract individual coordinates and convert to int
 
-        # Get bounding box confidence
-        conf = detections[i].conf.item()
+            # Get bounding box class ID and name
+            classidx = int(detections[i].cls.item())
+            classname = labels[classidx]
 
-        # Draw box if confidence threshold is high enough
-        if conf > 0.7:
+            # Get bounding box confidence
+            conf = detections[i].conf.item()
 
-            # Draw box around object
-            color = bbox_colors[classidx % 10]
-            cv2.rectangle(frame, (xmin,ymin), (xmax,ymax), color, 2)
+            # Draw box if confidence threshold is high enough
+            if conf > 0.7:
 
-            # Draw label for object
-            label = f'{classname}: {int(conf*100)}%'
-            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1) # Get font size
-            label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
-            cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), color, cv2.FILLED) # Draw white box to put label text in
-            cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1) # Draw label text
+                # Draw box around object
+                color = bbox_colors[classidx % 10]
+                cv2.rectangle(frame, (xmin,ymin), (xmax,ymax), color, 2)
 
-            # Add object to list of detected objects
-            objects_detected.append(classname)
-            
-    output = "OK"
-    for part in partsList:
-        labelName = part[1]               
-        quantityRequired = int(part[2])
+                # Draw label for object
+                label = f'{classname}: {int(conf*100)}%'
+                labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1) # Get font size
+                label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
+                cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), color, cv2.FILLED) # Draw white box to put label text in
+                cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1) # Draw label text
 
-        if objects_detected.count(labelName) != quantityRequired:
-            output = "NG"
+                # Add object to list of detected objects
+                objects_detected.append(classname)
+
+        output = "OK"
+        for part in partsList:
+            labelName = part[1]               
+            quantityRequired = int(part[2])
+
+            if objects_detected.count(labelName) != quantityRequired:
+                output = "NG"
+        
+        # Draw text box with data
+        draw_text_box(frame,(required+"\nOUTPUT: "+ output))
     
-    # Draw text box with data
-    draw_text_box(frame,(required+"\nOUTPUT: "+ output))
-    
+    else:
+        draw_text_box(frame,"Inference disabled.\nPress 't' to toggle")
+
     fps_counter_obj.update()
     fps_counter_obj.draw(frame)
     menu_obj.draw(frame)
@@ -327,9 +373,13 @@ while True:
         break
     elif key == ord('s') or key == ord('S'): # Press 's' to pause inference
         cv2.waitKey()
-    elif key == ord('p') or key == ord('P'): # Press 'p' to save a picture of results on this frame
-        cv2.imwrite('capture.png',frame)
-    elif key == ord('m') or key == ord('M'): # Press 'm' to move to the next data string 
+    elif key == ord('t') or key == ord('T'): # Press 't' to toggle inference
+        inference_enabled=not (inference_enabled)
+    elif key == ord('c') or key == ord('C'): # Press 'c' to save a picture of results on this frame
+        capture_obj.save(frame,menu_obj.get_capture_mode())
+    elif key == ord('m') or key == ord('M'): # Press 'm' to change capture mode
+        menu_obj.update_capture_mode()
+    elif key == ord('n') or key == ord('N'): # Press 'n' to move to the next data string 
         if (output=="OK"):
             completeBuild(current)
             current=getNextBuild()
