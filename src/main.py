@@ -246,19 +246,20 @@ class CaptureSaver:
     def _init_(self):
         save_dir=""
 
-    def save(self,frame,capture_mode):
+    def save(self,base_frame,bounding_box_frame,frame,capture_mode):
+        filename = timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         if capture_mode == 0:
             save_dir = "captures/camera_only_captures"
-            os.makedirs(save_dir, exist_ok=True)
+            write_frame = base_frame  
         elif capture_mode == 1:
-            save_dir = "captures/bouding_box_captures"
-            os.makedirs(save_dir, exist_ok=True)
+            save_dir = "captures/bouding_box_captures"  
+            write_frame = bounding_box_frame   
         elif capture_mode == 2:
-            save_dir = "captures/full screenshots"
-            os.makedirs(save_dir, exist_ok=True)
-        filename = timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            save_dir = "captures/full screenshots"  
+            write_frame = frame   
+        os.makedirs(save_dir, exist_ok=True)
         filename = f"{save_dir}/capture_{timestamp}.png"
-        cv2.imwrite(filename, frame)
+        cv2.imwrite(filename, write_frame)
         print(f"Saved: {filename}")
         
 # Check if model file exists and is valid
@@ -301,6 +302,7 @@ while True:
 
     # save base frame before inference, in case user wants to record it later
     base_frame = frame.copy()
+    bounding_box_frame = frame.copy()
 
     if inference_enabled:    
         # Run inference on frame with tracking enabled (tracking helps object to be consistently detected in each frame)
@@ -345,6 +347,8 @@ while True:
                 # Add object to list of detected objects
                 objects_detected.append(classname)
 
+            bounding_box_frame=frame.copy()
+
         output = "OK"
         for part in partsList:
             labelName = part[1]               
@@ -376,7 +380,7 @@ while True:
     elif key == ord('t') or key == ord('T'): # Press 't' to toggle inference
         inference_enabled=not (inference_enabled)
     elif key == ord('c') or key == ord('C'): # Press 'c' to save a picture of results on this frame
-        capture_obj.save(frame,menu_obj.get_capture_mode())
+        capture_obj.save(base_frame, bounding_box_frame, frame, menu_obj.get_capture_mode())
     elif key == ord('m') or key == ord('M'): # Press 'm' to change capture mode
         menu_obj.update_capture_mode()
     elif key == ord('n') or key == ord('N'): # Press 'n' to move to the next data string 
