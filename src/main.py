@@ -87,7 +87,7 @@ def draw_text_box(frame, text, corner="top-left", padding=10,
 
 def getNextBuild(filename='src/buildqueue.txt'):
     """
-    Returns the top line of the file and removes it from the source.
+    Returns the top line of the file without removing it from the source
     If file is empty, returns None.
     """
     with open(filename, "r") as f:
@@ -97,39 +97,50 @@ def getNextBuild(filename='src/buildqueue.txt'):
         return None  # empty file
 
     top_line = lines[0].rstrip("\n")
-    remaining = lines[1:]
-
-    with open(filename, "w") as f:
-        f.writelines(remaining)
 
     return top_line
 
-def completeBuild(line, filename="src/processed.txt"):
+def completeBuild(line, processedfilename="src/processed.txt", buildqueuefilename="src/buildqueue.txt"):
     """
-    Inserts the given line at the top of processed.txt.
+    Inserts the given line at the top of processed.txt, and removes the top line of buildqueue.txt
     """
-    with open(filename, "r") as f:
+    with open(processedfilename, "r") as f:
         existing = f.read()
 
-    with open(filename, "w") as f:
+    with open(processedfilename, "w") as f:
         f.write(line + "\n" + existing)
+
+    with open(buildqueuefilename, "r") as f:
+        remaining = f.readlines()[1:]
+
+    with open(buildqueuefilename, "w") as f:
+        f.writelines(remaining)
 
 def previousBuild(processed_file="src/processed.txt", buildqueue_file="src/buildqueue.txt"):
     """
-    Reads the top line of processed.txt and copies it to the top of buildqueue.txt
-    without removing it from processed.txt.
+    Moves the top line of processed.txt to the top of buildqueue.txt.
+    Removes it from processed.txt.
     """
-    # Get top line from processed.txt
-    with open(processed_file, "r") as f:
-        top_line = f.readline().rstrip("\n")
 
-    if not top_line:
+    # Read all lines from processed.txt
+    with open(processed_file, "r") as f:
+        lines = f.readlines()
+
+    if not lines:
         return None  # processed.txt empty
 
-    # Prepend to buildqueue.txt
+    top_line = lines[0].rstrip("\n")
+    remaining_lines = lines[1:]
+
+    # Rewrite processed.txt without the top line
+    with open(processed_file, "w") as f:
+        f.writelines(remaining_lines)
+
+    # Read existing buildqueue.txt content
     with open(buildqueue_file, "r") as f:
         existing = f.read()
 
+    # Prepend the removed line to buildqueue.txt
     with open(buildqueue_file, "w") as f:
         f.write(top_line + "\n" + existing)
 
@@ -221,7 +232,7 @@ class Menu:
     def __init__(self):
         self.capture_mode = 0 
         self.capture_modes = [[0,"cam only"],[1,"bounding boxes"],[2, "full screenshot"]]
-        self.options = "q-quit\ns-pause\nc-capture image - "+self.capture_modes[self.capture_mode][1]+"\nm-next capture mode\nn-next data\nt-toggle inference"
+        self.options = "q-quit\ns-pause\nc-capture image - "+self.capture_modes[self.capture_mode][1]+"\nm-next capture mode\nn-next data\nf-force next\nt-toggle inference"
         
     def update_capture_mode(self):
         if self.capture_mode==2:
@@ -389,6 +400,15 @@ while True:
             current=getNextBuild()
             partsList=lookupCurrent(current)
             required=getPartsListPrintable(partsList)
+    elif key == ord('f') or key == ord('F'): # Press 'f' to force next build
+            completeBuild(current)
+            current=getNextBuild()
+            partsList=lookupCurrent(current)
+            required=getPartsListPrintable(partsList)
+    elif key == ord('p') or key == ord('P'): # Press 'p' to return to previous build
+        current=previousBuild()
+        partsList=lookupCurrent(current)
+        required=getPartsListPrintable(partsList)
 
 # Clean up
 cap.release()
