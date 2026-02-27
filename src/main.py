@@ -6,6 +6,9 @@ import cv2
 import time
 from datetime import datetime
 from ultralytics import YOLO
+from picamera2 import Picamera2
+from libcamera import controls
+import warnings
 
 # Define path to model and other user variables
 model_path = 'models/yolov8s_playing_cards_ncnn_model'  # Path to model
@@ -282,10 +285,22 @@ if (not os.path.exists(model_path)):
 model = YOLO(model_path, task='detect')
 labels = model.names
 
-# Initialize camera
-cap = cv2.VideoCapture(cam_index)
-ret = cap.set(3, imgW)
-ret = cap.set(4, imgH)
+# Initialise camera - USB WEBCAM ONLY - COMMENT OUT IF USING PICAM
+#cap = cv2.VideoCapture(cam_index)
+#ret = cap.set(3, imgW)
+#ret = cap.set(4, imgH)
+#end of webcam settings
+
+# Initialise camera - PICAM MODEL 3 ONLY - COMMENT OUT IF USING WEBCAM
+picam2 = Picamera2()
+config = picam2.create_preview_configuration(
+    main={"size": (640, 480), "format": "BGR888"}
+)
+picam2.configure(config)
+picam2.start()
+#Set autofocus to continuous mode
+picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+#end of picam settings
 
 # Set bounding box colors (using the Tableu 10 color scheme)
 bbox_colors = [(164,120,87), (68,148,228), (93,97,209), (178,182,133), (88,159,106), 
@@ -306,8 +321,9 @@ inference_enabled = 1
 while True:
     
     # Grab frame from counter
-    ret, frame = cap.read()
-    if (frame is None) or (not ret):
+    frame = picam2.capture_array() #picam - comment out if using webcam
+    #ret, frame = cap.read() #webcam - comment out if using picam
+    if (frame is None): #or (not ret):
         print('Unable to read frames from the camera. This indicates the camera is disconnected or not working. Exiting program.')
         break
 
@@ -411,5 +427,5 @@ while True:
         required=getPartsListPrintable(partsList)
 
 # Clean up
-cap.release()
+#cap.release()
 cv2.destroyAllWindows()
