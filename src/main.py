@@ -9,11 +9,15 @@ from ultralytics import YOLO
 from picamera2 import Picamera2
 from libcamera import controls
 import warnings
+from gpiozero import LED
 
 # Define path to model and other user variables
 model_path = 'models/yolov8s_playing_cards_ncnn_model'  # Path to model
 cam_index = 0                          # Index of USB camera
 imgW, imgH = 1280, 720                 # Resolution to run USB camera at
+
+led= LED(23)
+light_status = False
   
 def draw_text_box(frame, text, corner="top-left", padding=10,
                   margin=10,
@@ -294,7 +298,7 @@ labels = model.names
 # Initialise camera - PICAM MODEL 3 ONLY - COMMENT OUT IF USING WEBCAM
 picam2 = Picamera2()
 config = picam2.create_preview_configuration(
-    main={"size": (640, 480), "format": "BGR888"}
+    main={"size": (1280, 720), "format": "BGR888"}
 )
 picam2.configure(config)
 picam2.start()
@@ -319,9 +323,9 @@ inference_enabled = 1
 
 # Begin inference loop
 while True:
-    
     # Grab frame from counter
     frame = picam2.capture_array() #picam - comment out if using webcam
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) #picam - comment out if using webcam
     #ret, frame = cap.read() #webcam - comment out if using picam
     if (frame is None): #or (not ret):
         print('Unable to read frames from the camera. This indicates the camera is disconnected or not working. Exiting program.')
@@ -425,6 +429,12 @@ while True:
         current=previousBuild()
         partsList=lookupCurrent(current)
         required=getPartsListPrintable(partsList)
+    elif key == ord('l') or key == ord('L'): # Press 'l' to toggle light
+        light_status = not light_status
+        if (light_status == True):
+            led.on()
+        elif (light_status == False):
+            led.off()
 
 # Clean up
 #cap.release()
