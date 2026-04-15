@@ -12,9 +12,10 @@ import warnings
 from gpiozero import LED
 
 # Define path to model and other user variables
-model_path = 'models/yolov8s_playing_cards_ncnn_model'  # Path to model
+model_path = 'models/model18_RPI4B_070426_ncnn_model'  # Path to model
 cam_index = 0                          # Index of USB camera
 imgW, imgH = 1280, 720                 # Resolution to run USB camera at
+imgsz = 512                  # Resolution to run model at
 
 led= LED(23)
 light_status = False
@@ -153,7 +154,7 @@ def previousBuild(processed_file="src/processed.txt", buildqueue_file="src/build
 
     return top_line
 
-def lookupCurrent(current, lookup_file="src/playing_cards_lookup.csv"):
+def lookupCurrent(current, lookup_file="src/lookup_v2.csv"):
     matches = []
     with open(lookup_file, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -320,7 +321,7 @@ fps_counter_obj = FPSCounter()
 menu_obj = Menu()
 capture_obj = CaptureSaver()
 inference_enabled = 1
-
+menu=True
 # Begin inference loop
 while True:
     # Grab frame from counter
@@ -337,7 +338,7 @@ while True:
 
     if inference_enabled:    
         # Run inference on frame with tracking enabled (tracking helps object to be consistently detected in each frame)
-        results = model.track(frame, verbose=False)
+        results = model.track(frame, verbose=False, imgsz=imgsz)
 
         # Extract results
         detections = results[0].boxes
@@ -362,7 +363,7 @@ while True:
             conf = detections[i].conf.item()
 
             # Draw box if confidence threshold is high enough
-            if conf > 0.7:
+            if conf > 0.3:
 
                 # Draw box around object
                 color = bbox_colors[classidx % 10]
@@ -396,7 +397,8 @@ while True:
 
     fps_counter_obj.update()
     fps_counter_obj.draw(frame)
-    menu_obj.draw(frame)
+    if menu==True:
+        menu_obj.draw(frame)
 
     # Display results
     cv2.imshow('Object Detection System',frame) # Display image
@@ -435,6 +437,9 @@ while True:
             led.on()
         elif (light_status == False):
             led.off()
+    elif key == ord('h') or key == ord('H'): # Press 'h' to toggle menu
+        menu=not(menu)
+        
 
 # Clean up
 #cap.release()
