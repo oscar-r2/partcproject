@@ -8,6 +8,10 @@
 #   -All users can perform a manual override, no administrator login is required
 #   -The user has no visual indication that individual class quantities are satisfied, only bounding boxes and overall
 #    condition (OK/NG)
+#Acknowledgements
+#   This program is adapted from "candy_calorie_counter.py" by EJ Electronics Constultants, available at
+#   https://github.com/EdjeElectronics/Train-and-Deploy-YOLO-Models/blob/main/examples/candy_calorie_counter/candy_calorie_counter.py
+
 
 # Imports
 import csv
