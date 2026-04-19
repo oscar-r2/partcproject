@@ -1,3 +1,14 @@
+#Title: "Optimising Object Detection Systems on Low-Cost Edge Devices for Automotive Manufacturing - Deployment Prototype"
+#Purpose: Demonstrate how a YOLO model can be used to verify a physical assembly process
+#Limitations:
+#   -The ability to alter confidence threshold class-by-class has not been added
+#   -The program works with a USB webcam OR Pi Camera Module 3 by commenting out certain lines - this cannot be changed
+#    without source code access
+#   -No logging or frame saving is present
+#   -All users can perform a manual override, no administrator login is required
+#   -The user has no visual indication that individual class quantities are satisfied, only bounding boxes and overall
+#    condition (OK/NG)
+
 # Imports
 import csv
 import os
@@ -15,11 +26,11 @@ from gpiozero import LED
 model_path = 'models/model18_RPI4B_070426_ncnn_model'  # Path to model
 cam_index = 0                          # Index of USB camera
 imgW, imgH = 1280, 720                 # Resolution to run USB camera at
-imgsz = 512                  # Resolution to run model at
-
+imgsz = 512                             # Resolution to run model at
 led= LED(23)
 light_status = False
-  
+
+#Function to create a text box with given text at a specified location
 def draw_text_box(frame, text, corner="top-left", padding=10,
                   margin=10,
                   bg_color=(50, 50, 50),
@@ -93,11 +104,9 @@ def draw_text_box(frame, text, corner="top-left", padding=10,
         )
         y_offset += line_spacing
 
+#Function to return the top line of the build queue file without removing it from the source 
 def getNextBuild(filename='src/buildqueue.txt'):
-    """
-    Returns the top line of the file without removing it from the source
-    If file is empty, returns None.
-    """
+    
     with open(filename, "r") as f:
         lines = f.readlines()
 
@@ -108,10 +117,8 @@ def getNextBuild(filename='src/buildqueue.txt'):
 
     return top_line
 
+#Inserts the given line at the top of processed.txt, and removes the top line of buildqueue.txt
 def completeBuild(line, processedfilename="src/processed.txt", buildqueuefilename="src/buildqueue.txt"):
-    """
-    Inserts the given line at the top of processed.txt, and removes the top line of buildqueue.txt
-    """
     with open(processedfilename, "r") as f:
         existing = f.read()
 
@@ -124,11 +131,8 @@ def completeBuild(line, processedfilename="src/processed.txt", buildqueuefilenam
     with open(buildqueuefilename, "w") as f:
         f.writelines(remaining)
 
+#Moves the top line of processed.txt to the top of buildqueue.txt and removes it from processed.txt.
 def previousBuild(processed_file="src/processed.txt", buildqueue_file="src/buildqueue.txt"):
-    """
-    Moves the top line of processed.txt to the top of buildqueue.txt.
-    Removes it from processed.txt.
-    """
 
     # Read all lines from processed.txt
     with open(processed_file, "r") as f:
@@ -154,6 +158,7 @@ def previousBuild(processed_file="src/processed.txt", buildqueue_file="src/build
 
     return top_line
 
+#Function to use the lookup table to turn the data string into a parts list
 def lookupCurrent(current, lookup_file="src/lookup_v2.csv"):
     matches = []
     with open(lookup_file, newline="") as csvfile:
@@ -208,6 +213,7 @@ def lookupCurrent(current, lookup_file="src/lookup_v2.csv"):
 
     return matches
 
+#Return a string of the parts list to display onscreen for the user
 def getPartsListPrintable(partsList):
     
     lines = []
@@ -221,6 +227,7 @@ def getPartsListPrintable(partsList):
 
     return "\n".join(lines)
 
+#A class to measure the current FPS and display it on screen at all times
 class FPSCounter:
     def __init__(self):
         self.prev_time = time.time()
@@ -235,7 +242,8 @@ class FPSCounter:
     def draw(self, frame):
         draw_text_box(frame,"FPS: "+ str((round(self.fps,2))),"top-right")
         return frame
-    
+
+# A class to display a list of commands on screen for the user   
 class Menu:
     def __init__(self):
         self.capture_mode = 0 
@@ -260,7 +268,8 @@ class Menu:
         draw_text_box(frame,self.options,"bottom-left")
 
         return frame
-    
+
+# A class to take screenshots with or without certain UI elements    
 class CaptureSaver:
     def _init_(self):
         save_dir=""
@@ -311,17 +320,18 @@ picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
 bbox_colors = [(164,120,87), (68,148,228), (93,97,209), (178,182,133), (88,159,106), 
               (96,202,231), (159,124,168), (169,162,241), (98,118,150), (172,176,184)]
 
-
+#get parts list based off next available data string
 current=getNextBuild()
 partsList=lookupCurrent(current)
 required=getPartsListPrintable(partsList)
 
-#define fps counter
+#define fps counter and menu objects
 fps_counter_obj = FPSCounter()
 menu_obj = Menu()
 capture_obj = CaptureSaver()
 inference_enabled = 1
 menu=True
+
 # Begin inference loop
 while True:
     # Grab frame from counter
@@ -440,7 +450,5 @@ while True:
     elif key == ord('h') or key == ord('H'): # Press 'h' to toggle menu
         menu=not(menu)
         
-
 # Clean up
-#cap.release()
 cv2.destroyAllWindows()
